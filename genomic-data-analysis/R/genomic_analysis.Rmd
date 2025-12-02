@@ -1,0 +1,39 @@
+---
+title: "Genomic Data Analysis"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, message=FALSE, warning=FALSE)
+library(DBI); library(RSQLite); library(tidyverse)
+db <- dbConnect(RSQLite::SQLite(), "sql/genomics.db")
+```
+
+## Metadata summary
+
+```{r meta}
+meta <- dbGetQuery(db, "SELECT * FROM metadata LIMIT 10")
+knitr::kable(meta)
+```
+
+## Gene expression boxplot for gene_0
+
+```{r gene0}
+expr <- dbGetQuery(db, "SELECT sample_id, gene_0 FROM expression") %>% as_tibble()
+expr_full <- expr %>% left_join(dbGetQuery(db, "SELECT sample_id, condition FROM metadata"), by="sample_id")
+library(ggplot2)
+ggplot(expr_full, aes(x=condition, y=gene_0)) + geom_boxplot() + theme_minimal() + ggtitle("gene_0 by condition")
+```
+
+```{r pca, fig.width=6, fig.height=5}
+expr_matrix <- dbGetQuery(db, "SELECT * FROM expression") %>% select(starts_with("gene_")) %>% as.matrix()
+rownames(expr_matrix) <- dbGetQuery(db, "SELECT sample_id FROM expression")$sample_id
+expr_log <- log1p(expr_matrix)
+pca <- prcomp(expr_log, center=TRUE, scale.=TRUE)
+pca_df <- as_tibble(pca$x[,1:3]) %>% mutate(sample_id = rownames(pca$x)) %>% left_join(dbGetQuery(db, "SELECT sample_id, condition FROM metadata"), by="sample_id")
+ggplot(pca_df, aes(x=PC1, y=PC2, color=condition)) + geom_point()
+```
+
+```{r cleanup}
+dbDisconnect(db)
+```
