@@ -1,0 +1,6 @@
+random_state: 42
+rf_n_estimators: 200
+target: response
+test_size: 0.2
+tf_batch_size: 32
+tf_epochs: 10
